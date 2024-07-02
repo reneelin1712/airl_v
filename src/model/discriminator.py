@@ -23,16 +23,20 @@ class DiscriminatorAIRLCNN(nn.Module):
         self.action_num = action_num
 
         # change
-        self.conv1 = nn.Conv2d(rs_input_dim, 20, 2, padding=1)  # [batch, 20, 3, 3]
+        self.conv1 = nn.Conv2d(rs_input_dim, 20, 2, padding=1)  # [batch, 20, 3, 3]  # +1 for weather feature
         self.pool = nn.MaxPool2d(2, 1)  # [batch, 20, 3, 3]
         self.conv2 = nn.Conv2d(20, 30, 2)  # [batch, 30, 1, 1]
         self.fc1 = nn.Linear(30 + self.action_num, 120)  # [batch, 120]
         self.fc2 = nn.Linear(120, 84)  # [batch, 84]
         self.fc3 = nn.Linear(84, 1)  # [batch, 8]
 
-        self.h_fc1 = nn.Linear(hs_input_dim, 120)  # [batch, 120]
+        self.h_fc1 = nn.Linear(hs_input_dim, 120)  # [batch, 120]  # +1 for weather feature
         self.h_fc2 = nn.Linear(120, 84)  # [batch, 84]
         self.h_fc3 = nn.Linear(84, 1)  # [batch, 8]
+
+        # Increase the input dimensions to account for the weather feature
+        self.conv1 = nn.Conv2d(rs_input_dim + 1, 20, 2, padding=1)
+        self.h_fc1 = nn.Linear(hs_input_dim + 1, 120)
 
     def to_device(self, device):
         self.policy_mask = self.policy_mask.to(device)
@@ -48,8 +52,13 @@ class DiscriminatorAIRLCNN(nn.Module):
                              :]
         neigh_edge_feature = self.link_feature[state_neighbor, :]
         neigh_mask_feature = self.policy_mask_pad[state].unsqueeze(-1)  # [batch_size, 9, 1]
-        neigh_feature = torch.cat([neigh_path_feature, neigh_edge_feature, neigh_mask_feature],
-                                  -1)
+
+        # Extract weather feature from the first dimension of state_neighbor
+        weather_feature = neigh_path_feature[:, :, 0].unsqueeze(-1).float()
+        neigh_feature = torch.cat([weather_feature, neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
+
+        # neigh_feature = torch.cat([neigh_path_feature, neigh_edge_feature, neigh_mask_feature],
+        #                           -1)
         neigh_feature = neigh_feature[:, self.new_index, :]
          # change x = neigh_feature.view(state.size(0), 3, 3, -1)
         x = neigh_feature.view(state.size(0), 2, 2, -1)
@@ -59,7 +68,13 @@ class DiscriminatorAIRLCNN(nn.Module):
     def process_state_features(self, state, des):
         path_feature = self.path_feature[state, des, :]  # 实在不行你也可以把第一个dimension拉平然后reshape 一下
         edge_feature = self.link_feature[state, :]
-        feature = torch.cat([path_feature, edge_feature], -1)  # [batch_size, n_path_feature + n_edge_feature]
+
+        # Extract weather feature from the first dimension of path_feature
+        weather_feature = path_feature[:, 0].unsqueeze(-1)
+    
+        # Concatenate weather_feature, path_feature, and edge_feature
+        feature = torch.cat([weather_feature, path_feature, edge_feature], -1)
+        # feature = torch.cat([path_feature, edge_feature], -1)  # [batch_size, n_path_feature + n_edge_feature]
         return feature
 
     def f(self, state, des, act, next_state):
@@ -97,15 +112,38 @@ class DiscriminatorAIRLCNN(nn.Module):
             logits = self.forward(states, des, act, log_pis, next_states)
             return -F.logsigmoid(-logits)
         
+
+    def get_single_input_features(self, state, des, action, next_state):
+        state_neighbor = self.action_state_pad[state]
+        neigh_path_feature = self.path_feature[state_neighbor, des.unsqueeze(1).repeat(1, self.action_num + 1), :]
+        neigh_edge_feature = self.link_feature[state_neighbor, :]
+
+      
+        current_path_feature = self.path_feature[state, des, :]
+        current_edge_feature = self.link_feature[state, :]
+
+        next_path_feature = self.path_feature[next_state, des, :]
+        print('next_path_feature',next_path_feature)
+        next_edge_feature = self.link_feature[next_state, :]
+
+        self.cur_state = state
+        return neigh_path_feature, neigh_edge_feature, current_path_feature, current_edge_feature, next_path_feature, next_edge_feature
+    
+    
     def get_input_features(self, state, des, action, next_state):
         state_neighbor = self.action_state_pad[state]
         neigh_path_feature = self.path_feature[state_neighbor, des.unsqueeze(1).repeat(1, self.action_num + 1), :]
         neigh_edge_feature = self.link_feature[state_neighbor, :]
 
+        # print('state',state)
+        # print('des',des)
+        # print('neigh_path_feature',neigh_path_feature)
         current_path_feature = neigh_path_feature[:, action, :][0,-1,:]
+        # print('current_path_feature',current_path_feature)
         current_edge_feature = neigh_edge_feature[:, action, :][0,-1,:]
 
         next_path_feature = self.path_feature[next_state, des, :]
+        print('next_path_feature',next_path_feature)
         next_edge_feature = self.link_feature[next_state, :]
 
         self.cur_state = state
@@ -113,6 +151,9 @@ class DiscriminatorAIRLCNN(nn.Module):
     
 
     def forward_with_actual_features(self, neigh_path_feature, neigh_edge_feature, path_feature, edge_feature, action,log_prob,next_path_feature, next_edge_feature):
+        # print('inputs', path_feature)
+        # print('inputs', edge_feature)
+        # print('shit',shit)
         # Calculate the neigh_mask_feature
         neigh_mask_feature = self.policy_mask_pad[self.cur_state].unsqueeze(-1)  # [batch_size, 9, 1]
 

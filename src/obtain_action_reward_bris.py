@@ -48,8 +48,8 @@ path_feature_p = "../bris_data/feature_od.npy"
 
 # train_p = "../data/shortest/shortest_paths.csv"
 # test_p = "../data/shortest/shortest_paths_test.csv"
-train_p = "../bris_data/shortest_paths_1.csv"
-test_p = "../bris_data/shortest_paths_1.csv"
+train_p = "../bris_data/shortest_paths_10.csv"
+test_p = "../bris_data/shortest_paths_10.csv"
 # model_p = "../trained_models/shortest/shortest.pt"
 
 """initialize road environment"""
@@ -88,7 +88,7 @@ for _, row in transit_data.iterrows():
 
 # Read the trajectory data from the CSV file
 trajectory_data = []
-with open('trajectories_bris.csv', 'r') as csvfile:
+with open('trajectories_bris_10.csv', 'r') as csvfile:
     csv_reader = csv.reader(csvfile)
     next(csv_reader)  # Skip the header row
     for row in csv_reader:
@@ -108,12 +108,28 @@ def evaluate_rewards(traj, policy_net, discrim_net, env, transit_dict):
         for step_idx in range(len(episode) - 1):
             state = torch.LongTensor([int(episode[step_idx])]).to(device)
             next_state = torch.LongTensor([int(episode[step_idx + 1])]).to(device)
+            possible_actions = transit_data[transit_data['link_id']==int(episode[step_idx])]['action']
+            print('possible_actions',possible_actions)
+            possible_next_states = transit_data[transit_data['link_id']==int(episode[step_idx])]['next_link_id']
+            for act,next_link in zip(possible_actions,possible_next_states):
+                 print('step_idx',step_idx)
+                 print('act',act)
+                 print('next_link',next_link)
+                 act_tensor =  torch.LongTensor([act]).to(device) if act != 'N/A' else None
+                 next =  torch.LongTensor([int(next_link)]).to(device)
+                 with torch.no_grad():
+                    log_prob = policy_net.get_log_prob(state, des, act_tensor).squeeze()
+                    discrim_net.get_single_input_features(state, des, int(act), next)
+                    reward = discrim_net.calculate_reward(state, des, act_tensor, log_prob, next).item()
+                    print('reward',reward)
+
             action = transit_dict.get((int(episode[step_idx]), int(episode[step_idx + 1])), 'N/A')
             action_tensor = torch.LongTensor([action]).to(device) if action != 'N/A' else None
             
             if action_tensor is not None:
                 with torch.no_grad():
                     log_prob = policy_net.get_log_prob(state, des, action_tensor).squeeze()
+                    discrim_net.get_single_input_features(state, des, int(action), next_state)
                     reward = discrim_net.calculate_reward(state, des, action_tensor, log_prob, next_state).item()
             else:
                 reward = 'N/A'

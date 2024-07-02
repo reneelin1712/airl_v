@@ -21,27 +21,28 @@ def load_model(model_path):
     print("Discrim Model loaded Successfully")
 
 cv = 0  # cross validation process [0, 1, 2, 3, 4]
+cv_test = 5
 size = 1000  # size of training data [100, 1000, 10000]
 gamma = 0.99  # discount factor
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
-test_p = "../data/cross_validation/test_CV%d.csv" % cv
+test_p = "../data/cross_validation/test_CV%d.csv" % cv_test
 
 """environment"""
 edge_p = "../data/edge.txt"
 network_p = "../data/transit.npy"
 path_feature_p = "../data/feature_od.npy"
-# train_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-# # test_p = "../data/cross_validation/test_CV%d.csv" % cv
-# # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+train_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+# test_p = "../data/cross_validation/test_CV%d.csv" % cv
+# test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
 # test_p = "../data/shortest/shortest_paths_test.csv"
 
 # model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
-train_p = "../data/shortest/shortest_paths.csv"
-test_p = "../data/shortest/shortest_paths_test.csv"
-# test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-model_p = "../trained_models/shortest/shortest.pt"
+# train_p = "../data/shortest/shortest_paths.csv"
+# test_p = "../data/shortest/shortest_paths.csv"
+# # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+# model_p = "../trained_models/shortest/shortest.pt"
 
 """inialize road environment"""
 od_list, od_dist = ini_od_dist(train_p)

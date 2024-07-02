@@ -29,6 +29,9 @@ class PolicyCNN(nn.Module):
         self.fc2 = nn.Linear(120, 84)  # [batch, 84]
         self.fc3 = nn.Linear(84, action_num)  # [batch, 8]
 
+        # Increase the input dimension by 1 to account for the weather feature
+        self.conv1 = nn.Conv2d(input_dim + 1, 20, 2, padding=1)
+
     def to_device(self, device):
         self.policy_mask = self.policy_mask.to(device)
         self.policy_mask_pad = self.policy_mask_pad.to(device)
@@ -42,9 +45,17 @@ class PolicyCNN(nn.Module):
         # self.action_state_pad = self.action_state_pad.to(state.device)
         state_neighbor = self.action_state_pad[state]
         neigh_path_feature = self.path_feature[state_neighbor, des.unsqueeze(1).repeat(1, self.action_num + 1), :]
+        # print('neigh_path_feature',neigh_path_feature)
         neigh_edge_feature = self.link_feature[state_neighbor, :]
+        # print('neigh_edge_feature',neigh_edge_feature)
         neigh_mask_feature = self.policy_mask_pad[state].unsqueeze(-1)  # [batch_size, 9, 1]
-        neigh_feature = torch.cat([neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
+
+         # Extract weather feature from the first dimension of state_neighbor
+        # print('state_neighbor', state_neighbor)
+        weather_feature = neigh_path_feature[:, :, 0].unsqueeze(-1).float()
+        neigh_feature = torch.cat([weather_feature, neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
+
+        # neigh_feature = torch.cat([neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
         neigh_feature = neigh_feature[:, self.new_index, :]
         # print('neigh_feature',neigh_feature)
         # change x = neigh_feature.view(state.size(0), 3, 3, -1)

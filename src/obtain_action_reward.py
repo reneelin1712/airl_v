@@ -40,16 +40,16 @@ test_p = "../data/cross_validation/test_CV%d.csv" % cv
 edge_p = "../data/edge.txt"
 network_p = "../data/transit.npy"
 path_feature_p = "../data/feature_od.npy"
-# train_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-# # test_p = "../data/cross_validation/test_CV%d.csv" % cv
-# test_p = "../data/shortest/shortest_paths_test.csv"
-# # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-# model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
-
-train_p = "../data/shortest/shortest_paths.csv"
+train_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+# test_p = "../data/cross_validation/test_CV%d.csv" % cv
 test_p = "../data/shortest/shortest_paths_test.csv"
 # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-model_p = "../trained_models/shortest/shortest.pt"
+model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
+
+# train_p = "../data/shortest/shortest_paths.csv"
+# test_p = "../data/shortest/shortest_paths_test.csv"
+# # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+# model_p = "../trained_models/shortest/shortest.pt"
 
 """initialize road environment"""
 od_list, od_dist = ini_od_dist(train_p)

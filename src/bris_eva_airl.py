@@ -35,14 +35,14 @@ path_feature_p = "../bris_data/feature_od.npy"
 # # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
 # test_p = "../data/shortest/shortest_paths_test.csv"
 
-model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
+# model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
 # train_p = "../data/shortest/shortest_paths.csv"
 # test_p = "../data/shortest/shortest_paths_test.csv"
 
-train_p = "../bris_data/shortest_paths_1.csv"
-test_p = "../bris_data/shortest_paths_1.csv"
+train_p = "../bris_data/both_paths.csv"
+test_p = "../bris_data/both_paths.csv"
 # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-# model_p = "../trained_models/shortest/shortest.pt"
+model_p = "../trained_models/shortest/shortest.pt"
 
 """inialize road environment"""
 od_list, od_dist = ini_od_dist(train_p)

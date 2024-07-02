@@ -15,6 +15,9 @@ class ValueCNN(nn.Module):
         self.fc2 = nn.Linear(120, 84)  # [batch, 84]
         self.fc3 = nn.Linear(84, 1)  # [batch, 8]
 
+        # Increase the input dimension by 1 to account for the weather feature
+        self.fc1 = nn.Linear(input_dim + 1, 120)
+
     def to_device(self, device):
         self.path_feature = self.path_feature.to(device)
         self.link_feature = self.link_feature.to(device)
@@ -23,7 +26,12 @@ class ValueCNN(nn.Module):
         # print('state', state.shape, 'des', des.shape)
         path_feature = self.path_feature[state, des, :]
         edge_feature = self.link_feature[state, :]
-        feature = torch.cat([path_feature, edge_feature], -1)  # [batch_size, n_path_feature + n_edge_feature]
+
+        # Extract weather feature from the first dimension of state
+        weather_feature = path_feature[:, 0].unsqueeze(-1).float()
+
+        feature = torch.cat([weather_feature, path_feature, edge_feature], -1)
+        # feature = torch.cat([path_feature, edge_feature], -1)  # [batch_size, n_path_feature + n_edge_feature]
         return feature
 
     def forward(self, state, des):  # 这是policy
