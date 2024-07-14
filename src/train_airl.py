@@ -17,6 +17,7 @@ from utils.load_data import ini_od_dist, load_path_feature, load_link_feature, \
     minmax_normalization, load_train_sample, load_test_traj
 
 import csv
+import pandas as pd
 
 torch.backends.cudnn.enabled = False
 
@@ -177,6 +178,9 @@ def hard_update(target, source):
         target_param.data.copy_(param.data)
 
 
+edge_data = pd.read_csv('../data/edge_updated.txt')
+speed_data = {(row['n_id'], row['time_step']): row['speed'] for _, row in edge_data.iterrows()}
+
 if __name__ == '__main__':
     log_std = -0.0  # log std for the policy
     gamma = 0.99  # discount factor
@@ -200,13 +204,23 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     """environment"""
-    edge_p = "C:/AI/airlff_v/data/edge.txt"
-    network_p = "C:/AI/airlff_v/data/transit.npy"
-    path_feature_p = "C:/AI/airlff_v/data/feature_od.npy"
-    train_p = "C:/AI/airlff_v/data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-    test_p = "C:/AI/airlff_v/data/cross_validation/test_CV%d.csv" % cv
+    # edge_p = "C:/AI/airlff_v/data/edge.txt"
+    # network_p = "C:/AI/airlff_v/data/transit.npy"
+    # path_feature_p = "C:/AI/airlff_v/data/feature_od.npy"
+    # train_p = "C:/AI/airlff_v/data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+    # test_p = "C:/AI/airlff_v/data/cross_validation/test_CV%d.csv" % cv
+    # # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+    # model_p = "C:/AI/airlff_v/trained_models/airl_CV%d_size%d.pt" % (cv, size)
+
+    edge_p = "../data/edge.txt"
+    network_p = "../data/transit.npy"
+    path_feature_p = "../data/feature_od.npy"
+    train_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+    test_p = "../data/cross_validation/test_CV%d.csv" % cv
     # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-    model_p = "C:/AI/airlff_v/trained_models/airl_CV%d_size%d.pt" % (cv, size)
+    model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
+
+
     """inialize road environment"""
     od_list, od_dist = ini_od_dist(train_p)
     env = RoadWorld(network_p, edge_p, pre_reset=(od_list, od_dist))
@@ -226,14 +240,14 @@ if __name__ == '__main__':
     policy_net = PolicyCNN(env.n_actions, env.policy_mask, env.state_action,
                            path_feature_pad, edge_feature_pad,
                            path_feature_pad.shape[-1] + edge_feature_pad.shape[-1] + 1,
-                           env.pad_idx).to(device)
+                           env.pad_idx,speed_data).to(device)
     value_net = ValueCNN(path_feature_pad, edge_feature_pad,
-                         path_feature_pad.shape[-1] + edge_feature_pad.shape[-1]).to(device)
+                         path_feature_pad.shape[-1] + edge_feature_pad.shape[-1],speed_data).to(device)
     discrim_net = DiscriminatorAIRLCNN(env.n_actions, gamma, env.policy_mask,
                                        env.state_action, path_feature_pad, edge_feature_pad,
                                        path_feature_pad.shape[-1] + edge_feature_pad.shape[-1] + 1,
                                        path_feature_pad.shape[-1] + edge_feature_pad.shape[-1],
-                                       env.pad_idx).to(device)
+                                       env.pad_idx,speed_data).to(device)
     policy_net.to_device(device)
     value_net.to_device(device)
     discrim_net.to_device(device)

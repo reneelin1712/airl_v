@@ -6,12 +6,11 @@ import pandas as pd
 
 
 class ValueCNN(nn.Module):
-    def __init__(self, path_feature, link_feature, input_dim, pad_idx=None):
+    def __init__(self, path_feature, link_feature, input_dim, pad_idx=None, speed_data=None):
         super(ValueCNN, self).__init__()
 
         # Load speed data
-        edge_data = pd.read_csv('C:/AI/airlff_v/data/edge_updated.txt')
-        self.speed_data = {(row['n_id'], row['time_step']): row['speed'] for _, row in edge_data.iterrows()}
+        self.speed_data = speed_data
 
         self.path_feature = torch.from_numpy(path_feature).float()
         self.link_feature = torch.from_numpy(link_feature).float()

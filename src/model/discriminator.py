@@ -8,12 +8,11 @@ import pandas as pd
 
 class DiscriminatorAIRLCNN(nn.Module):
     def __init__(self, action_num, gamma, policy_mask, action_state, path_feature, link_feature, rs_input_dim,
-                 hs_input_dim, pad_idx=None):
+                 hs_input_dim, pad_idx=None, speed_data=None):
         super(DiscriminatorAIRLCNN, self).__init__()
 
         # Load speed data
-        edge_data = pd.read_csv('C:/AI/airlff_v/data/edge_updated.txt')
-        self.speed_data = {(row['n_id'], row['time_step']): row['speed'] for _, row in edge_data.iterrows()}
+        self.speed_data = speed_data
 
         self.gamma = gamma
         self.policy_mask = torch.from_numpy(policy_mask).long()

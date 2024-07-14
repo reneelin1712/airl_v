@@ -7,12 +7,11 @@ import pandas as pd
 
 
 class PolicyCNN(nn.Module):
-    def __init__(self, action_num, policy_mask, action_state, path_feature, link_feature, input_dim, pad_idx=None):
+    def __init__(self, action_num, policy_mask, action_state, path_feature, link_feature, input_dim, pad_idx=None, speed_data=None):
         super(PolicyCNN, self).__init__()
 
         # Load speed data
-        edge_data = pd.read_csv('C:/AI/airlff_v/data/edge_updated.txt')
-        self.speed_data = {(row['n_id'], row['time_step']): row['speed'] for _, row in edge_data.iterrows()}
+        self.speed_data = speed_data
 
         self.policy_mask = torch.from_numpy(policy_mask).long()
         policy_mask_pad = np.concatenate([policy_mask, np.zeros((policy_mask.shape[0], 1), dtype=np.int32)], 1)
