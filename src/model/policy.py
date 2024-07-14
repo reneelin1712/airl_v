@@ -49,11 +49,11 @@ class PolicyCNN(nn.Module):
 
         # self.action_state_pad = self.action_state_pad.to(state.device)
         state_neighbor = self.action_state_pad[state]
-        print('state_neighbor', state_neighbor)
+        # print('state_neighbor', state_neighbor)
         neigh_path_feature = self.path_feature[state_neighbor, des.unsqueeze(1).repeat(1, self.action_num + 1), :]
-        print('neigh_path_feature',neigh_path_feature)
+        # print('neigh_path_feature',neigh_path_feature)
         neigh_edge_feature = self.link_feature[state_neighbor, :]
-        print('neigh_edge_feature',neigh_edge_feature)
+        # print('neigh_edge_feature',neigh_edge_feature)
         neigh_mask_feature = self.policy_mask_pad[state].unsqueeze(-1)  # [batch_size, 9, 1]
 
         # Get speed features
@@ -66,13 +66,13 @@ class PolicyCNN(nn.Module):
             speed_features.append(speed_row)
         speed_feature = torch.tensor(speed_features, dtype=torch.float32, device=state.device).unsqueeze(-1)
         
-        print('speed_feature',speed_feature)
+        # print('speed_feature',speed_feature)
         # weather_feature = neigh_path_feature[:, :, 0].unsqueeze(-1).float()
         neigh_feature = torch.cat([speed_feature, neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
 
         # neigh_feature = torch.cat([neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
         neigh_feature = neigh_feature[:, self.new_index, :]
-        print('neigh_feature',neigh_feature)
+        # print('neigh_feature',neigh_feature)
         # change x = neigh_feature.view(state.size(0), 3, 3, -1)
         x = neigh_feature.view(state.size(0), 2, 2, -1)
         x = x.permute(0, 3, 1, 2)

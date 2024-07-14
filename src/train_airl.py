@@ -114,7 +114,7 @@ def load_model(model_path):
 
 
 def main_loop():
-    force_cudnn_initialization()
+    #force_cudnn_initialization()
 
     best_edit = 1.0
     # Open a CSV file for logging
@@ -242,7 +242,7 @@ if __name__ == '__main__':
                            path_feature_pad.shape[-1] + edge_feature_pad.shape[-1] + 1,
                            env.pad_idx,speed_data).to(device)
     value_net = ValueCNN(path_feature_pad, edge_feature_pad,
-                         path_feature_pad.shape[-1] + edge_feature_pad.shape[-1],speed_data).to(device)
+                         path_feature_pad.shape[-1] + edge_feature_pad.shape[-1],speed_data=speed_data).to(device)
     discrim_net = DiscriminatorAIRLCNN(env.n_actions, gamma, env.policy_mask,
                                        env.state_action, path_feature_pad, edge_feature_pad,
                                        path_feature_pad.shape[-1] + edge_feature_pad.shape[-1] + 1,

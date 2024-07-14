@@ -11,67 +11,26 @@ smoothie = SmoothingFunction().method1
 device = torch.device("cpu")
 
 
-# def create_od_set(test_trajs):
-#     test_od_dict = {}
-#     for i in range(len(test_trajs)):
-#         if (test_trajs[i][0], test_trajs[i][-1]) in test_od_dict.keys():
-#             test_od_dict[(test_trajs[i][0], test_trajs[i][-1])].append(i)
-#         else:
-#             test_od_dict[(test_trajs[i][0], test_trajs[i][-1])] = [i]
-#     return test_od_dict
-
 def create_od_set(test_trajs):
     test_od_dict = {}
     for i in range(len(test_trajs)):
-        od_key = (test_trajs[i][0], test_trajs[i][-1], test_trajs[i].time_step)  # Include time_step in the key
-        if od_key in test_od_dict:
-            test_od_dict[od_key].append(i)
+        if (test_trajs[i][0], test_trajs[i][-1]) in test_od_dict.keys():
+            test_od_dict[(test_trajs[i][0], test_trajs[i][-1])].append(i)
         else:
-            test_od_dict[od_key] = [i]
+            test_od_dict[(test_trajs[i][0], test_trajs[i][-1])] = [i]
     return test_od_dict
 
+# new
+# def create_od_set(test_trajs):
+#     test_od_dict = {}
+#     for i in range(len(test_trajs)):
+#         od_key = (test_trajs[i][0], test_trajs[i][-1], test_trajs[i].time_step)  # Include time_step in the key
+#         if od_key in test_od_dict:
+#             test_od_dict[od_key].append(i)
+#         else:
+#             test_od_dict[od_key] = [i]
+#     return test_od_dict
 
-# def evaluate_edit_dist(test_trajs, learner_trajs, test_od_dict):
-#     edit_dist_list = []
-#     for od in test_od_dict.keys():
-#         idx_list = test_od_dict[od]
-#         test_od_trajs = set(['_'.join(test_trajs[i]) for i in idx_list])
-#         test_od_trajs = [traj.split('_') for traj in test_od_trajs]
-#         learner_od_trajs = [learner_trajs[i] for i in idx_list]
-#         for learner in learner_od_trajs:
-#             min_edit_dist = 1.0
-#             for test in test_od_trajs:
-#                 edit_dist = editdistance.eval(test, learner) / len(test)
-#                 min_edit_dist = edit_dist if edit_dist < min_edit_dist else min_edit_dist
-#             edit_dist_list.append(min_edit_dist)
-#     return np.mean(edit_dist_list)
-
-
-# def evaluate_bleu_score(test_trajs, learner_trajs, test_od_dict):
-#     bleu_score_list = []
-#     for od in test_od_dict.keys():
-#         idx_list = test_od_dict[od]
-#         # get unique reference
-#         test_od_trajs = set(['_'.join(test_trajs[i]) for i in idx_list])
-#         test_od_trajs = [traj.split('_') for traj in test_od_trajs]
-#         learner_od_trajs = [learner_trajs[i] for i in idx_list]
-#         for learner in learner_od_trajs:
-#             # print(test_od_trajs)
-#             # print(learner)
-#             bleu_score = sentence_bleu(test_od_trajs, learner, smoothing_function=smoothie)
-#             bleu_score_list.append(bleu_score)
-
-#         # Save test and learner trajectories side by side in a CSV file
-#     with open('trajectories.csv', 'w', newline='') as csvfile:
-#         csv_writer = csv.writer(csvfile)
-#         csv_writer.writerow(['Test Trajectory', 'Learner Trajectory'])
-        
-#         for test_traj, learner_traj in zip(test_trajs, learner_trajs):
-#             test_traj_str = '_'.join(test_traj)
-#             learner_traj_str = '_'.join(learner_traj)
-#             csv_writer.writerow([test_traj_str, learner_traj_str])
-
-#     return np.mean(bleu_score_list)
 
 def evaluate_edit_dist(test_trajs, learner_trajs, test_od_dict):
     edit_dist_list = []
@@ -84,7 +43,7 @@ def evaluate_edit_dist(test_trajs, learner_trajs, test_od_dict):
             min_edit_dist = 1.0
             for test in test_od_trajs:
                 edit_dist = editdistance.eval(test, learner) / len(test)
-                min_edit_dist = min(edit_dist, min_edit_dist)
+                min_edit_dist = edit_dist if edit_dist < min_edit_dist else min_edit_dist
             edit_dist_list.append(min_edit_dist)
     return np.mean(edit_dist_list)
 
@@ -93,13 +52,55 @@ def evaluate_bleu_score(test_trajs, learner_trajs, test_od_dict):
     bleu_score_list = []
     for od in test_od_dict.keys():
         idx_list = test_od_dict[od]
+        # get unique reference
         test_od_trajs = set(['_'.join(test_trajs[i]) for i in idx_list])
         test_od_trajs = [traj.split('_') for traj in test_od_trajs]
         learner_od_trajs = [learner_trajs[i] for i in idx_list]
         for learner in learner_od_trajs:
+            # print(test_od_trajs)
+            # print(learner)
             bleu_score = sentence_bleu(test_od_trajs, learner, smoothing_function=smoothie)
             bleu_score_list.append(bleu_score)
+
+        # Save test and learner trajectories side by side in a CSV file
+    with open('trajectories.csv', 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(['Test Trajectory', 'Learner Trajectory'])
+        
+        for test_traj, learner_traj in zip(test_trajs, learner_trajs):
+            test_traj_str = '_'.join(test_traj)
+            learner_traj_str = '_'.join(learner_traj)
+            csv_writer.writerow([test_traj_str, learner_traj_str])
+
     return np.mean(bleu_score_list)
+
+# def evaluate_edit_dist(test_trajs, learner_trajs, test_od_dict):
+#     edit_dist_list = []
+#     for od in test_od_dict.keys():
+#         idx_list = test_od_dict[od]
+#         test_od_trajs = set(['_'.join(test_trajs[i]) for i in idx_list])
+#         test_od_trajs = [traj.split('_') for traj in test_od_trajs]
+#         learner_od_trajs = [learner_trajs[i] for i in idx_list]
+#         for learner in learner_od_trajs:
+#             min_edit_dist = 1.0
+#             for test in test_od_trajs:
+#                 edit_dist = editdistance.eval(test, learner) / len(test)
+#                 min_edit_dist = min(edit_dist, min_edit_dist)
+#             edit_dist_list.append(min_edit_dist)
+#     return np.mean(edit_dist_list)
+
+
+# def evaluate_bleu_score(test_trajs, learner_trajs, test_od_dict):
+#     bleu_score_list = []
+#     for od in test_od_dict.keys():
+#         idx_list = test_od_dict[od]
+#         test_od_trajs = set(['_'.join(test_trajs[i]) for i in idx_list])
+#         test_od_trajs = [traj.split('_') for traj in test_od_trajs]
+#         learner_od_trajs = [learner_trajs[i] for i in idx_list]
+#         for learner in learner_od_trajs:
+#             bleu_score = sentence_bleu(test_od_trajs, learner, smoothing_function=smoothie)
+#             bleu_score_list.append(bleu_score)
+#     return np.mean(bleu_score_list)
 
 
 def evaluate_dataset_dist(test_trajs, learner_trajs):
@@ -119,35 +120,37 @@ def evaluate_dataset_dist(test_trajs, learner_trajs):
     return distance.jensenshannon(test_p, learner_p)
 
 
-# def evaluate_log_prob(test_traj, model):
-#     log_prob_list = []
-#     for episode in test_traj:
-#         des = torch.LongTensor([episode[-1].next_state]).long().to(device)
-#         log_prob = 0
-#         for x in episode:
-#             with torch.no_grad():
-#                 next_prob = torch.log(model.get_action_prob(torch.LongTensor([x.cur_state]).to(device), des)).squeeze()
-#             next_prob_np = next_prob.detach().cpu().numpy()
-
-#             #change
-#             log_prob += next_prob_np[int(x.action)]
-#         log_prob_list.append(log_prob)
-#     print(np.mean(log_prob_list))
-#     return np.mean(log_prob_list)
 def evaluate_log_prob(test_traj, model):
     log_prob_list = []
     for episode in test_traj:
         des = torch.LongTensor([episode[-1].next_state]).long().to(device)
-        time_step = torch.LongTensor([episode[0].time_step]).long().to(device)  # Assuming time_step is constant for the episode
         log_prob = 0
         for x in episode:
             with torch.no_grad():
-                next_prob = torch.log(model.get_action_prob(torch.LongTensor([x.cur_state]).to(device), des, time_step)).squeeze()
+                next_prob = torch.log(model.get_action_prob(torch.LongTensor([x.cur_state]).to(device), des)).squeeze()
             next_prob_np = next_prob.detach().cpu().numpy()
+
+            #change
             log_prob += next_prob_np[int(x.action)]
         log_prob_list.append(log_prob)
     print(np.mean(log_prob_list))
     return np.mean(log_prob_list)
+
+
+# def evaluate_log_prob(test_traj, model):
+#     log_prob_list = []
+#     for episode in test_traj:
+#         des = torch.LongTensor([episode[-1].next_state]).long().to(device)
+#         time_step = torch.LongTensor([episode[0].time_step]).long().to(device)  # Assuming time_step is constant for the episode
+#         log_prob = 0
+#         for x in episode:
+#             with torch.no_grad():
+#                 next_prob = torch.log(model.get_action_prob(torch.LongTensor([x.cur_state]).to(device), des, time_step)).squeeze()
+#             next_prob_np = next_prob.detach().cpu().numpy()
+#             log_prob += next_prob_np[int(x.action)]
+#         log_prob_list.append(log_prob)
+#     print(np.mean(log_prob_list))
+#     return np.mean(log_prob_list)
 
 
 def evaluate_train_edit_dist(train_traj, learner_traj):
