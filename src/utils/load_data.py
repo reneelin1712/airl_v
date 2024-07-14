@@ -45,11 +45,11 @@ def minmax_normalization(feature, xmax, xmin):
 def load_train_sample(train_path):
     df = pd.read_csv(train_path, nrows=1000)
     test_traj = [path.split('_') for path in df['path'].tolist()]
-    return test_traj, df[['ori', 'des']].values
+    return test_traj, df[['ori', 'des','time_step']].values
 
 
 def load_test_traj(test_path):
     df = pd.read_csv(test_path)
     df.sort_values(by=["des", "ori"], inplace=True)
     test_traj = [path.split('_') for path in df['path'].tolist()]
-    return test_traj, df[['ori', 'des']].values
+    return test_traj, df[['ori', 'des', 'time_step']].values

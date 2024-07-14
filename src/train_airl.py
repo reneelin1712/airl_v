@@ -33,11 +33,12 @@ def update_params_airl(batch, i_iter):
     actions = torch.from_numpy(np.stack(batch.action)).long().to(device)
     destinations = torch.from_numpy(np.stack(batch.destination)).long().to(device)
     next_states = torch.from_numpy(np.stack(batch.next_state)).long().to(device)
+    time_steps = torch.from_numpy(np.stack(batch.time_step)).long().to(device)
 
     with torch.no_grad():
-        values = value_net(states, destinations)
-        next_values = value_net(next_states, destinations)
-        fixed_log_probs = policy_net.get_log_prob(states, destinations, actions)
+        values = value_net(states, destinations, time_steps)
+        next_values = value_net(next_states, destinations, time_steps)
+        fixed_log_probs = policy_net.get_log_prob(states, destinations, actions, time_steps)
 
     """update discriminator"""
     e_o, g_o, discrim_loss = None, None, None
@@ -51,11 +52,13 @@ def update_params_airl(batch, i_iter):
         s_expert_des = expert_des[indices].to(device)
         s_expert_ac = expert_ac[indices].to(device)
         s_expert_next_st = expert_next_st[indices].to(device)
+        s_expert_time_step = expert_time_step[indices].to(device)
+
         with torch.no_grad():
-            expert_log_probs = policy_net.get_log_prob(s_expert_st, s_expert_des, s_expert_ac)
+            expert_log_probs = policy_net.get_log_prob(s_expert_st, s_expert_des, s_expert_ac, s_expert_time_step)
         # states, des, log_pis, next_states
-        g_o = discrim_net(states, destinations, actions, fixed_log_probs, next_states)
-        e_o = discrim_net(s_expert_st, s_expert_des, s_expert_ac, expert_log_probs, s_expert_next_st)
+        g_o = discrim_net(states, destinations, actions, fixed_log_probs, next_states, time_steps)
+        e_o = discrim_net(s_expert_st, s_expert_des, s_expert_ac, expert_log_probs, s_expert_next_st, s_expert_time_step)
         loss_pi = -F.logsigmoid(-g_o).mean()
         loss_exp = -F.logsigmoid(e_o).mean()
         discrim_loss = loss_pi + loss_exp
@@ -63,7 +66,7 @@ def update_params_airl(batch, i_iter):
         discrim_loss.backward()
         optimizer_discrim.step()
     """get advantage estimation from the trajectories"""
-    rewards = discrim_net.calculate_reward(states, destinations, actions, fixed_log_probs, next_states).squeeze()
+    rewards = discrim_net.calculate_reward(states, destinations, actions, fixed_log_probs, next_states, time_steps).squeeze()
     advantages, returns = estimate_advantages(rewards, masks, bad_masks, values, next_values, gamma, tau, device)
     """perform mini-batch PPO update"""
     value_loss, policy_loss = 0, 0
@@ -73,17 +76,17 @@ def update_params_airl(batch, i_iter):
         perm = np.arange(states.shape[0])
         np.random.shuffle(perm)
         perm = torch.LongTensor(perm).to(device)
-        states, destinations, actions, returns, advantages, fixed_log_probs = \
+        states, destinations, actions, returns, advantages, fixed_log_probs, time_steps = \
             states[perm].clone(), destinations[perm].clone(), actions[perm].clone(), returns[perm].clone(), advantages[
-                perm].clone(), fixed_log_probs[perm].clone()
+                perm].clone(), fixed_log_probs[perm].clone(), time_steps[perm].clone()
         for i in range(optim_iter_num):
             ind = slice(i * optim_batch_size, min((i + 1) * optim_batch_size, states.shape[0]))
-            states_b, destinations_b, actions_b, advantages_b, returns_b, fixed_log_probs_b = \
-                states[ind], destinations[ind], actions[ind], advantages[ind], returns[ind], fixed_log_probs[ind]
+            states_b, destinations_b, actions_b, advantages_b, returns_b, fixed_log_probs_b, time_steps_b = \
+                states[ind], destinations[ind], actions[ind], advantages[ind], returns[ind], fixed_log_probs[ind], time_steps[ind]
             batch_value_loss, batch_policy_loss = ppo_step(policy_net, value_net, optimizer_policy, optimizer_value, 1,
                                                            states_b, destinations_b, actions_b, returns_b,
                                                            advantages_b, fixed_log_probs_b, clip_epsilon, l2_reg,
-                                                           max_grad_norm)
+                                                           max_grad_norm, time_steps_b)
             value_loss += batch_value_loss.item()
             policy_loss += batch_policy_loss.item()
     return discrim_loss.item(), value_loss, policy_loss
@@ -197,13 +200,13 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     """environment"""
-    edge_p = "../data/edge.txt"
-    network_p = "../data/transit.npy"
-    path_feature_p = "../data/feature_od.npy"
-    train_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-    test_p = "../data/cross_validation/test_CV%d.csv" % cv
+    edge_p = "C:/AI/airlff_v/data/edge.txt"
+    network_p = "C:/AI/airlff_v/data/transit.npy"
+    path_feature_p = "C:/AI/airlff_v/data/feature_od.npy"
+    train_p = "C:/AI/airlff_v/data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
+    test_p = "C:/AI/airlff_v/data/cross_validation/test_CV%d.csv" % cv
     # test_p = "../data/cross_validation/train_CV%d_size%d.csv" % (cv, size)
-    model_p = "../trained_models/airl_CV%d_size%d.pt" % (cv, size)
+    model_p = "C:/AI/airlff_v/trained_models/airl_CV%d_size%d.pt" % (cv, size)
     """inialize road environment"""
     od_list, od_dist = ini_od_dist(train_p)
     env = RoadWorld(network_p, edge_p, pre_reset=(od_list, od_dist))
@@ -239,8 +242,10 @@ if __name__ == '__main__':
     optimizer_value = torch.optim.Adam(value_net.parameters(), lr=learning_rate)
     optimizer_discrim = torch.optim.Adam(discrim_net.parameters(), lr=learning_rate)
     """load expert trajectory"""
-    expert_st, expert_des, expert_ac, expert_next_st = env.import_demonstrations(train_p)
-    to_device(device, expert_st, expert_des, expert_ac, expert_next_st)
+    # expert_st, expert_des, expert_ac, expert_next_st = env.import_demonstrations(train_p)
+    # to_device(device, expert_st, expert_des, expert_ac, expert_next_st)
+    expert_st, expert_des, expert_ac, expert_next_st, expert_time_step = env.import_demonstrations(train_p)
+    to_device(device, expert_st, expert_des, expert_ac, expert_next_st, expert_time_step)
     print('done load expert data... num of episode: %d' % len(expert_st))
     """load expert trajectory"""
     test_trajs, test_od = load_train_sample(train_p)

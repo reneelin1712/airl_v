@@ -27,22 +27,23 @@ def collect_samples(pid, queue, env, policy, custom_reward,
     num_episodes = 0
 
     while num_steps < min_batch_size:
-        state, des = env.reset()
+        state, des, time_step = env.reset() # Get timestep from reset
         reward_episode = 0
         des_var = torch.tensor(des).long().unsqueeze(0)
         for t in range(50):
             state_var = torch.tensor(state).long().unsqueeze(0)
+            time_step_var = torch.tensor(time_step).long().unsqueeze(0)
             with torch.no_grad():
                 if mean_action:
-                    action = torch.argmax(policy.get_action_prob(state_var, des_var)).unsqueeze(0).numpy()
+                    action = torch.argmax(policy.get_action_prob(state_var, des_var, time_step_var)).unsqueeze(0).numpy()
                 else:
-                    action = policy.select_action(state_var, des_var)[0].numpy()
+                    action = policy.select_action(state_var, des_var, time_step_var)[0].numpy()
             action = int(action)
             next_state, reward, done = env.step(action)
             reward_episode += reward
             mask = 0 if (done or t == 49) else 1
             bad_mask = 0 if (next_state == env.pad_idx or t == 49) else 1
-            memory.push(state, des, action, next_state, reward, mask, bad_mask)
+            memory.push(state, des, action, next_state, reward, mask, bad_mask, time_step) #timestep
             if done:
                 break
             state = next_state
@@ -77,17 +78,18 @@ def collect_routes_with_OD(pid, batch_od, queue, env, policy, custom_reward,
 
     trajs = []
     for i in range(batch_od.shape[0]):
-        state, des = env.reset(int(batch_od[i, 0]), int(batch_od[i, 1]))
+        state, des, time_step = env.reset(int(batch_od[i, 0]), int(batch_od[i, 1]))
         reward_episode = 0
         des_var = torch.tensor(des).long().unsqueeze(0)
+        time_step_var = torch.tensor(time_step).long().unsqueeze(0) # timestep
         traj = [str(state)]
         for t in range(50):
             state_var = torch.tensor(state).long().unsqueeze(0)
             with torch.no_grad():
                 if mean_action:
-                    action = torch.argmax(policy.get_action_prob(state_var, des_var)).unsqueeze(0).numpy()
+                    action = torch.argmax(policy.get_action_prob(state_var, des_var, time_step_var)).unsqueeze(0).numpy()
                 else:
-                    action = policy.select_action(state_var, des_var)[0].numpy()
+                    action = policy.select_action(state_var, des_var, time_step_var)[0].numpy()
             action = int(action)
             next_state, _, done = env.step(action)
             if next_state == -1:

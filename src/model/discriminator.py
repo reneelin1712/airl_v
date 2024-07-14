@@ -3,12 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 torch.backends.cudnn.enabled = False
+import pandas as pd
 
 
 class DiscriminatorAIRLCNN(nn.Module):
     def __init__(self, action_num, gamma, policy_mask, action_state, path_feature, link_feature, rs_input_dim,
                  hs_input_dim, pad_idx=None):
         super(DiscriminatorAIRLCNN, self).__init__()
+
+        # Load speed data
+        edge_data = pd.read_csv('C:/AI/airlff_v/data/edge_updated.txt')
+        self.speed_data = {(row['n_id'], row['time_step']): row['speed'] for _, row in edge_data.iterrows()}
+
         self.gamma = gamma
         self.policy_mask = torch.from_numpy(policy_mask).long()
         policy_mask_pad = np.concatenate([policy_mask, np.zeros((policy_mask.shape[0], 1), dtype=np.int32)], 1)
@@ -46,16 +52,26 @@ class DiscriminatorAIRLCNN(nn.Module):
         self.link_feature = self.link_feature.to(device)
         self.new_index = self.new_index.to(device)
 
-    def process_neigh_features(self, state, des):
+    def process_neigh_features(self, state, des, time_step):
         state_neighbor = self.action_state_pad[state]
         neigh_path_feature = self.path_feature[state_neighbor, des.unsqueeze(1).repeat(1, self.action_num + 1),
                              :]
         neigh_edge_feature = self.link_feature[state_neighbor, :]
         neigh_mask_feature = self.policy_mask_pad[state].unsqueeze(-1)  # [batch_size, 9, 1]
 
-        # Extract weather feature from the first dimension of state_neighbor
-        weather_feature = neigh_path_feature[:, :, 0].unsqueeze(-1).float()
-        neigh_feature = torch.cat([weather_feature, neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
+        # # Extract weather feature from the first dimension of state_neighbor
+        # weather_feature = neigh_path_feature[:, :, 0].unsqueeze(-1).float()
+         # Get speed features
+        speed_features = []
+        for i in range(state.size(0)):
+            speed_row = []
+            for neighbor in state_neighbor[i]:
+                speed = self.speed_data.get((neighbor.item(), time_step[i].item()), 0)  # Default to 0 if not found
+                speed_row.append(speed)
+            speed_features.append(speed_row)
+        speed_feature = torch.tensor(speed_features, dtype=torch.float32, device=state.device).unsqueeze(-1)
+
+        neigh_feature = torch.cat([speed_feature, neigh_path_feature, neigh_edge_feature, neigh_mask_feature], -1)
 
         # neigh_feature = torch.cat([neigh_path_feature, neigh_edge_feature, neigh_mask_feature],
         #                           -1)
@@ -65,21 +81,28 @@ class DiscriminatorAIRLCNN(nn.Module):
         x = x.permute(0, 3, 1, 2)
         return x
 
-    def process_state_features(self, state, des):
+    def process_state_features(self, state, des, time_step):
         path_feature = self.path_feature[state, des, :]  # 实在不行你也可以把第一个dimension拉平然后reshape 一下
         edge_feature = self.link_feature[state, :]
 
-        # Extract weather feature from the first dimension of path_feature
-        weather_feature = path_feature[:, 0].unsqueeze(-1)
+        # # Extract weather feature from the first dimension of path_feature
+        # weather_feature = path_feature[:, 0].unsqueeze(-1)
+            # Get speed features
+        speed_features = []
+        for i in range(state.size(0)):
+            speed = self.speed_data.get((state[i].item(), time_step[i].item()), 0)  # Default to 0 if not found
+            speed_features.append(speed)
+        speed_feature = torch.tensor(speed_features, dtype=torch.float32, device=state.device).unsqueeze(-1)
+
     
         # Concatenate weather_feature, path_feature, and edge_feature
-        feature = torch.cat([weather_feature, path_feature, edge_feature], -1)
+        feature = torch.cat([speed_feature, path_feature, edge_feature], -1)
         # feature = torch.cat([path_feature, edge_feature], -1)  # [batch_size, n_path_feature + n_edge_feature]
         return feature
 
-    def f(self, state, des, act, next_state):
+    def f(self, state, des, act, next_state, time_step):
         """rs"""
-        x = self.process_neigh_features(state, des)
+        x = self.process_neigh_features(state, des, time_step)
         x = self.pool(F.leaky_relu(self.conv1(x), 0.2))
         x = F.leaky_relu(self.conv2(x), 0.2)
         x = x.view(-1, 30)  # 到这一步等于是对这个3x3的图提取feature
@@ -90,26 +113,26 @@ class DiscriminatorAIRLCNN(nn.Module):
         rs = self.fc3(x)
 
         """hs"""
-        x_state = self.process_state_features(state, des)
+        x_state = self.process_state_features(state, des, time_step)
         x_state = F.leaky_relu(self.h_fc1(x_state), 0.2)
         x_state = F.leaky_relu(self.h_fc2(x_state), 0.2)
         x_state = self.h_fc3(x_state)
 
         """hs_next"""
-        next_x_state = self.process_state_features(next_state, des)
+        next_x_state = self.process_state_features(next_state, des, time_step)
         next_x_state = F.leaky_relu(self.h_fc1(next_x_state), 0.2)
         next_x_state = F.leaky_relu(self.h_fc2(next_x_state), 0.2)
         next_x_state = self.h_fc3(next_x_state)
 
         return rs + self.gamma * next_x_state - x_state
 
-    def forward(self, states, des, act, log_pis, next_states):
+    def forward(self, states, des, act, log_pis, next_states, time_steps):
         # Discriminator's output is sigmoid(f - log_pi).
-        return self.f(states, des, act, next_states) - log_pis
+        return self.f(states, des, act, next_states, time_steps) - log_pis
 
-    def calculate_reward(self, states, des, act, log_pis, next_states):
+    def calculate_reward(self, states, des, act, log_pis, next_states, time_steps):
         with torch.no_grad():
-            logits = self.forward(states, des, act, log_pis, next_states)
+            logits = self.forward(states, des, act, log_pis, next_states, time_steps)
             return -F.logsigmoid(-logits)
         
 

@@ -67,19 +67,22 @@ class RoadWorld(object):
 
         self.cur_state = None
         self.cur_des = None
+        self.cur_time_step = None # timestep
 
         if pre_reset is not None:
             self.od_list = pre_reset[0]
             self.od_dist = pre_reset[1]
 
-    def reset(self, st=None, des=None):
+    def reset(self, st=None, des=None, time_step=None): # timestep
         if st is not None and des is not None:
             self.cur_state, self.cur_des = st, des
+            self.cur_time_step = time_step if time_step is not None else 1
         else:
             od_idx = np.random.choice(self.od_list, 1, p=self.od_dist)
             ori, des = od_idx[0].split('_')
             self.cur_state, self.cur_des = int(ori), int(des)
-        return self.cur_state, self.cur_des
+            self.cur_time_step = np.random.randint(1, 8) # timestep
+        return self.cur_state, self.cur_des, self.cur_time_step
 
     def get_reward(self, state):
         return self.rewards[int(state)]
@@ -117,8 +120,8 @@ class RoadWorld(object):
 
     def import_demonstrations(self, demopath, od=None, n_rows=None):
         demo = pd.read_csv(demopath, header=0, nrows=n_rows)
-        expert_st, expert_des, expert_ac, expert_st_next = [], [], [], []
-        for demo_str, demo_des in zip(demo['path'].tolist(), demo['des'].tolist()):
+        expert_st, expert_des, expert_ac, expert_st_next, expert_time_step = [], [], [], [], []
+        for demo_str, demo_des, demo_time_step in zip(demo['path'].tolist(), demo['des'].tolist(), demo['time_step'].tolist()):
             cur_demo = [int(r) for r in demo_str.split('_')]
             len_demo = len(cur_demo)
             for i0 in range(1, len_demo):
@@ -131,13 +134,14 @@ class RoadWorld(object):
                 expert_des.append(demo_des)
                 expert_ac.append(action)
                 expert_st_next.append(next_state)
+                expert_time_step.append(demo_time_step)
         return torch.LongTensor(expert_st), torch.LongTensor(expert_des), torch.LongTensor(expert_ac), torch.LongTensor(
-            expert_st_next)
+            expert_st_next), torch.LongTensor(expert_time_step)
 
     def import_demonstrations_step(self, demopath, n_rows=None):
         demo = pd.read_csv(demopath, header=0, nrows=n_rows)
         trajs = []
-        for demo_str, demo_des in zip(demo['path'].tolist(), demo['des'].tolist()):
+        for demo_str, demo_des, demo_time_step in zip(demo['path'].tolist(), demo['des'].tolist(), demo['time_step'].tolist()):
             cur_demo = [int(r) for r in demo_str.split('_')]
             len_demo = len(cur_demo)
             episode = []
@@ -162,7 +166,7 @@ class RoadWorld(object):
                 is_done = next_state == demo_des
 
                 episode.append(
-                    Step(cur_state=cur_state, action=action, next_state=next_state, reward=reward, done=is_done))
+                    Step(cur_state=cur_state, action=action, next_state=next_state, reward=reward, done=is_done, time_step=demo_time_step))
             trajs.append(episode)
             self.max_route_length = len(episode) if self.max_route_length < len(episode) else self.max_route_length
         print('max_route_length', self.max_route_length)
