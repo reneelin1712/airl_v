@@ -128,6 +128,9 @@ class RoadWorld(object):
                 cur_state = cur_demo[i0 - 1]
                 next_state = cur_demo[i0]
                 action_list = self.get_action_list(cur_state)
+                print('cur_state',cur_state)
+                print('action_list',action_list)
+                print('next_state',next_state)
                 j = [self.get_state_transition(cur_state, a0) for a0 in action_list].index(next_state)
                 action = action_list[j]
                 expert_st.append(cur_state)
