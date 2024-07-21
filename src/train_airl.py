@@ -178,7 +178,7 @@ def hard_update(target, source):
         target_param.data.copy_(param.data)
 
 
-edge_data = pd.read_csv('../data/edge_updated.txt')
+edge_data = pd.read_csv('../data/updated_edges.txt')
 speed_data = {(row['n_id'], row['time_step']): row['speed'] for _, row in edge_data.iterrows()}
 
 if __name__ == '__main__':

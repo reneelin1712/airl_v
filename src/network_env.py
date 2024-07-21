@@ -19,6 +19,11 @@ class RoadWorld(object):
         self.k = k
         self.max_route_length = 0
 
+        # Load the training data to find valid time steps for each origin-destination pair
+        training_data_path = '../data/formatted_data_w_timestep.csv'
+        self.training_data = pd.read_csv(training_data_path)
+        self.od_time_map = self.training_data.groupby(['ori', 'des'])['time_step'].unique().to_dict()
+
         # define transition matrix
         netconfig = np.load(self.network_path)
         netconfig = pd.DataFrame(netconfig, columns=["from", "con", "to"])
@@ -76,13 +81,21 @@ class RoadWorld(object):
     def reset(self, st=None, des=None, time_step=None): # timestep
         if st is not None and des is not None:
             self.cur_state, self.cur_des = st, des
-            self.cur_time_step = time_step if time_step is not None else 1
+            self.cur_time_step = time_step if time_step is not None else self.get_most_common_time_step()
         else:
             od_idx = np.random.choice(self.od_list, 1, p=self.od_dist)
             ori, des = od_idx[0].split('_')
             self.cur_state, self.cur_des = int(ori), int(des)
-            self.cur_time_step = np.random.randint(1, 8) # timestep
+            valid_time_steps = self.od_time_map.get((self.cur_state, self.cur_des), [])
+            if valid_time_steps.size > 0:
+                self.cur_time_step = np.random.choice(valid_time_steps)  # Choose a valid time step randomly
+            else:
+                self.cur_time_step = self.get_most_common_time_step()  # Use the most common time step as default
         return self.cur_state, self.cur_des, self.cur_time_step
+    
+    def get_most_common_time_step(self):
+        # This method calculates the most common time step from the training data
+        return self.training_data['time_step'].mode()[0] if not self.training_data['time_step'].mode().empty else None
 
     def get_reward(self, state):
         return self.rewards[int(state)]
